@@ -2,15 +2,19 @@
 # (serialize-only, deserialize-only, roundtrip), saving a JSON summary per run
 # to .\results. 5 endpoints x 3 counts x 3 modes = 45 runs.
 #
+# A cooldown pause runs between every test so GC/connection cleanup from one run
+# doesn't bleed into the next run's numbers.
+#
 # Usage:
 #   .\run-all.ps1
-#   .\run-all.ps1 -BaseUrl http://localhost:5000 -Vus 50 -Duration 30s
-# To keep a first pass shorter, try: .\run-all.ps1 -Duration 10s
+#   .\run-all.ps1 -BaseUrl http://localhost:5000 -Vus 20 -Duration 15s -Cooldown 10
+# To keep a first pass shorter, try: .\run-all.ps1 -Duration 10s -Cooldown 2
 
 param(
     [string]$BaseUrl = "http://localhost:5000",
-    [int]$Vus = 25,
-    [string]$Duration = "30s"
+    [int]$Vus = 20,
+    [string]$Duration = "15s",
+    [int]$Cooldown = 10
 )
 
 $Counts = @(10, 100, 1000)
@@ -42,6 +46,9 @@ foreach ($mode in $Modes) {
             $env:MODE = $mode
 
             k6 run --summary-export="results/${endpoint}_${mode}_${count}.json" load-test.js
+
+            Write-Host "Cooling down for $Cooldown s..."
+            Start-Sleep -Seconds $Cooldown
         }
     }
 }

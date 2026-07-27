@@ -1,0 +1,74 @@
+name: Serializer API Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: "Virtual users per run"
+        required: false
+        default: "20"
+      duration:
+        description: "Duration per run (e.g. 15s, 30s)"
+        required: false
+        default: "15s"
+  # Uncomment to also run automatically, e.g. weekly, for regression tracking:
+  # schedule:
+  #   - cron: "0 6 * * 1"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Generate payloads
+        run: dotnet run -c Release --project SerializerApiBench.PayloadGenerator
+
+      - name: Build and start API (Docker, capped at 2 CPU / 512MB)
+        run: docker compose up --build -d
+
+      - name: Wait for API to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:5000/ > /dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            echo "Waiting for API..."
+            sleep 2
+          done
+          echo "API did not start in time"
+          docker compose logs
+          exit 1
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run benchmark suite
+        working-directory: k6
+        env:
+          VUS: ${{ github.event.inputs.vus || '20' }}
+          DURATION: ${{ github.event.inputs.duration || '15s' }}
+        run: |
+          chmod +x run-all.sh
+          ./run-all.sh
+
+      - name: Stop API
+        if: always()
+        run: docker compose down
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results
+          path: k6/results/*.json
+          retention-days: 30
