@@ -1,0 +1,4 @@
+bin/
+obj/
+payloads/*.bin
+k6/results/

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option csharp_namespace = "SerializerApiBench.Models.Proto";
+
+package serializerapibench;
+
+message AddressProto {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string zip = 4;
+  string country = 5;
+}
+
+message TestPayloadProto {
+  int32 id = 1;
+  string name = 2;
+  bool is_active = 3;
+  double score = 4;
+  string created_at = 5;
+  string description = 6;
+  int32 age = 7;
+  float rating = 8;
+  repeated string tags = 9;
+  repeated string categories = 10;
+  AddressProto address = 11;
+}
+
+message TestPayloadListProto {
+  repeated TestPayloadProto items = 1;
+}
