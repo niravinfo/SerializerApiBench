@@ -1,17 +1,20 @@
-# Runs every serializer endpoint at every payload size, saving a JSON summary
-# per run to .\results. Adjust $Vus / $Duration to taste.
+# Runs every serializer endpoint, at every payload size, in all three modes
+# (serialize-only, deserialize-only, roundtrip), saving a JSON summary per run
+# to .\results. 5 endpoints x 3 counts x 3 modes = 45 runs.
 #
 # Usage:
 #   .\run-all.ps1
 #   .\run-all.ps1 -BaseUrl http://localhost:5000 -Vus 50 -Duration 30s
+# To keep a first pass shorter, try: .\run-all.ps1 -Duration 10s
 
 param(
     [string]$BaseUrl = "http://localhost:5000",
-    [int]$Vus = 50,
+    [int]$Vus = 25,
     [string]$Duration = "30s"
 )
 
 $Counts = @(10, 100, 1000)
+$Modes = @("serialize-only", "deserialize-only", "roundtrip")
 
 $Endpoints = @{
     "json"             = "application/json"
@@ -23,20 +26,23 @@ $Endpoints = @{
 
 New-Item -ItemType Directory -Force -Path "results" | Out-Null
 
-foreach ($count in $Counts) {
-    foreach ($endpoint in $Endpoints.Keys) {
-        $contentType = $Endpoints[$endpoint]
-        Write-Host ""
-        Write-Host "=== $endpoint  (count=$count) ==="
+foreach ($mode in $Modes) {
+    foreach ($count in $Counts) {
+        foreach ($endpoint in $Endpoints.Keys) {
+            $contentType = $Endpoints[$endpoint]
+            Write-Host ""
+            Write-Host "=== $endpoint  mode=$mode  count=$count ==="
 
-        $env:BASE_URL = $BaseUrl
-        $env:ENDPOINT = $endpoint
-        $env:COUNT = $count
-        $env:CONTENT_TYPE = $contentType
-        $env:VUS = $Vus
-        $env:DURATION = $Duration
+            $env:BASE_URL = $BaseUrl
+            $env:ENDPOINT = $endpoint
+            $env:COUNT = $count
+            $env:CONTENT_TYPE = $contentType
+            $env:VUS = $Vus
+            $env:DURATION = $Duration
+            $env:MODE = $mode
 
-        k6 run --summary-export="results/${endpoint}_${count}.json" load-test.js
+            k6 run --summary-export="results/${endpoint}_${mode}_${count}.json" load-test.js
+        }
     }
 }
 

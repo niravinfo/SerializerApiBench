@@ -5,5 +5,5 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:5000"
-    cpus: 1.0
+    cpus: 2.0
     mem_limit: 512m

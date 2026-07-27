@@ -16,7 +16,7 @@ var mpLz4Options = MessagePackSerializerOptions.Standard.WithCompression(Message
 
 foreach (var count in counts)
 {
-    var list = GenerateTestData(count);
+    var list = TestDataFactory.Generate(count);
 
     File.WriteAllBytes(Path.Combine(outDir, $"payload_json_{count}.bin"),
         JsonSerializer.SerializeToUtf8Bytes(list));
@@ -41,34 +41,3 @@ foreach (var count in counts)
 }
 
 Console.WriteLine($"Done. Payloads written to: {outDir}");
-
-static List<TestPayload> GenerateTestData(int count)
-{
-    var rnd = new Random(42); // fixed seed: identical payload content across all formats/runs
-    var list = new List<TestPayload>(count);
-    for (int i = 0; i < count; i++)
-    {
-        list.Add(new TestPayload
-        {
-            Id = i,
-            Name = $"Item-{i}",
-            IsActive = i % 2 == 0,
-            Score = rnd.NextDouble() * 100,
-            CreatedAt = DateTime.UtcNow.AddMinutes(-i),
-            Description = $"This is a description for item number {i}, used for benchmark payload generation.",
-            Age = rnd.Next(18, 80),
-            Rating = (float)(rnd.NextDouble() * 5),
-            Tags = new List<string> { "tag1", "tag2", "tag3" },
-            Categories = new List<string> { "categoryA", "categoryB" },
-            Address = new Address
-            {
-                Street = $"{rnd.Next(1, 999)} Main St",
-                City = "Springfield",
-                State = "IL",
-                Zip = "62704",
-                Country = "USA"
-            }
-        });
-    }
-    return list;
-}
