@@ -18,7 +18,8 @@ param(
 )
 
 $Counts = @(10, 100, 1000)
-$Modes = @("serialize-only", "deserialize-only", "roundtrip")
+# $Modes = @("serialize-only", "deserialize-only", "roundtrip")
+$Modes = @("serialize-only", "deserialize-only")
 
 $Endpoints = @{
     "json"             = "application/json"
