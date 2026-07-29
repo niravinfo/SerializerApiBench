@@ -18,8 +18,10 @@ foreach (var count in counts)
 {
     var list = TestDataFactory.Generate(count);
 
-    File.WriteAllBytes(Path.Combine(outDir, $"payload_json_{count}.bin"),
-        JsonSerializer.SerializeToUtf8Bytes(list));
+    var utf8Json = JsonSerializer.SerializeToUtf8Bytes(list);
+
+    File.WriteAllBytes(Path.Combine(outDir, $"payload_json_{count}.bin"), utf8Json);
+    File.WriteAllBytes(Path.Combine(outDir, $"payload_newtonsoft-json_{count}.bin"), utf8Json);
 
     File.WriteAllBytes(Path.Combine(outDir, $"payload_messagepack_{count}.bin"),
         MessagePackSerializer.Serialize(list, mpOptions));

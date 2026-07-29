@@ -28,6 +28,16 @@ var cache = new Dictionary<int, List<TestPayload>>
     [1000] = TestDataFactory.Generate(1000),
 };
 
+// Pre-convert and cache Google Protobuf versions for fair benchmarking
+// (other formats don't need conversion from cached data)
+var protoCache = new Dictionary<int, TestPayloadListProto>();
+foreach (var kvp in cache)
+{
+    var listProto = new TestPayloadListProto();
+    listProto.Items.AddRange(kvp.Value.Select(p => p.ToProto()));
+    protoCache[kvp.Key] = listProto;
+}
+
 app.MapGet("/", () => "SerializerApiBench.Api is running. See README for endpoint list.");
 
 // ============================================================
@@ -42,41 +52,62 @@ app.MapPost("/api/json/roundtrip", async (HttpContext ctx) =>
     await JsonSerializer.SerializeAsync(ctx.Response.Body, list);
 });
 
+app.MapPost("/api/newtonsoft-json/roundtrip", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var requestJson = await reader.ReadToEndAsync();
+    var list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<TestPayload>>(requestJson);
+
+    var responseJson = Newtonsoft.Json.JsonConvert.SerializeObject(list);
+    ctx.Response.ContentType = "application/json";
+    await ctx.Response.WriteAsync(responseJson);
+});
+
 app.MapPost("/api/messagepack/roundtrip", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    var list = MessagePackSerializer.Deserialize<List<TestPayload>>(bytes, mpOptions);
-    var result = MessagePackSerializer.Serialize(list, mpOptions);
+    var list = await MessagePackSerializer.DeserializeAsync<List<TestPayload>>(ctx.Request.Body, mpOptions);
     ctx.Response.ContentType = "application/x-msgpack";
-    await ctx.Response.Body.WriteAsync(result);
+    await MessagePackSerializer.SerializeAsync(ctx.Response.Body, list, mpOptions);
 });
 
 app.MapPost("/api/messagepack-lz4/roundtrip", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    var list = MessagePackSerializer.Deserialize<List<TestPayload>>(bytes, mpLz4Options);
-    var result = MessagePackSerializer.Serialize(list, mpLz4Options);
+    var list = await MessagePackSerializer.DeserializeAsync<List<TestPayload>>(ctx.Request.Body, mpLz4Options);
     ctx.Response.ContentType = "application/x-msgpack";
-    await ctx.Response.Body.WriteAsync(result);
+    await MessagePackSerializer.SerializeAsync(ctx.Response.Body, list, mpLz4Options);
 });
 
 app.MapPost("/api/protobuf-net/roundtrip", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    using var ms = new MemoryStream(bytes);
-    var list = Serializer.Deserialize<List<TestPayload>>(ms);
-    using var outMs = new MemoryStream();
-    Serializer.Serialize(outMs, list);
+    // Read request body into memory stream for async operation
+    using var requestMs = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(requestMs);
+    requestMs.Position = 0;
+
+    var list = Serializer.Deserialize<List<TestPayload>>(requestMs);
+
+    using var responseMs = new MemoryStream();
+    Serializer.Serialize(responseMs, list);
+    responseMs.Position = 0;
+
     ctx.Response.ContentType = "application/x-protobuf";
-    await ctx.Response.Body.WriteAsync(outMs.ToArray());
+    await responseMs.CopyToAsync(ctx.Response.Body);
 });
 
 app.MapPost("/api/google-protobuf/roundtrip", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    var listProto = TestPayloadListProto.Parser.ParseFrom(bytes);
+    // Read request body into memory for async operation
+    using var requestMs = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(requestMs);
+    var requestBytes = requestMs.ToArray();
+
+    var listProto = TestPayloadListProto.Parser.ParseFrom(requestBytes);
+
+    // Serialize to byte array, then write async
+    var responseBytes = listProto.ToByteArray();
+
     ctx.Response.ContentType = "application/x-protobuf";
-    await ctx.Response.Body.WriteAsync(listProto.ToByteArray());
+    await ctx.Response.Body.WriteAsync(responseBytes);
 });
 
 // ============================================================
@@ -90,34 +121,46 @@ app.MapGet("/api/json/serialize-only", async (HttpContext ctx, int count) =>
     await JsonSerializer.SerializeAsync(ctx.Response.Body, cache[count]);
 });
 
+app.MapGet("/api/newtonsoft-json/serialize-only", async (HttpContext ctx, int count) =>
+{
+    var json = Newtonsoft.Json.JsonConvert.SerializeObject(cache[count]);
+    ctx.Response.ContentType = "application/json";
+
+    await ctx.Response.WriteAsync(json);
+});
+
 app.MapGet("/api/messagepack/serialize-only", async (HttpContext ctx, int count) =>
 {
-    var bytes = MessagePackSerializer.Serialize(cache[count], mpOptions);
     ctx.Response.ContentType = "application/x-msgpack";
-    await ctx.Response.Body.WriteAsync(bytes);
+
+    // Serialize directly to response body stream for maximum performance
+    // No intermediate byte[] allocation
+    await MessagePackSerializer.SerializeAsync(ctx.Response.Body, cache[count], mpOptions);
 });
 
 app.MapGet("/api/messagepack-lz4/serialize-only", async (HttpContext ctx, int count) =>
 {
-    var bytes = MessagePackSerializer.Serialize(cache[count], mpLz4Options);
     ctx.Response.ContentType = "application/x-msgpack";
-    await ctx.Response.Body.WriteAsync(bytes);
+    await MessagePackSerializer.SerializeAsync(ctx.Response.Body, cache[count], mpLz4Options);
 });
 
 app.MapGet("/api/protobuf-net/serialize-only", async (HttpContext ctx, int count) =>
 {
+    // Serialize to memory stream, then write async to response
     using var ms = new MemoryStream();
     Serializer.Serialize(ms, cache[count]);
+    ms.Position = 0;
+
     ctx.Response.ContentType = "application/x-protobuf";
-    await ctx.Response.Body.WriteAsync(ms.ToArray());
+    await ms.CopyToAsync(ctx.Response.Body);
 });
 
 app.MapGet("/api/google-protobuf/serialize-only", async (HttpContext ctx, int count) =>
 {
-    var listProto = new TestPayloadListProto();
-    listProto.Items.AddRange(cache[count].Select(p => p.ToProto()));
+    // Serialize to byte array, then write async
+    var bytes = protoCache[count].ToByteArray();
     ctx.Response.ContentType = "application/x-protobuf";
-    await ctx.Response.Body.WriteAsync(listProto.ToByteArray());
+    await ctx.Response.Body.WriteAsync(bytes);
 });
 
 // ============================================================
@@ -131,40 +174,47 @@ app.MapPost("/api/json/deserialize-only", async (HttpContext ctx) =>
     await ctx.Response.WriteAsync((list?.Count ?? 0).ToString());
 });
 
+app.MapPost("/api/newtonsoft-json/deserialize-only", async (HttpContext ctx) =>
+{
+    using var reader = new StreamReader(ctx.Request.Body);
+    var json = await reader.ReadToEndAsync();
+    var list = Newtonsoft.Json.JsonConvert.DeserializeObject<List<TestPayload>>(json);
+
+    await ctx.Response.WriteAsync((list?.Count ?? 0).ToString());
+});
+
 app.MapPost("/api/messagepack/deserialize-only", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    var list = MessagePackSerializer.Deserialize<List<TestPayload>>(bytes, mpOptions);
+    var list = await MessagePackSerializer.DeserializeAsync<List<TestPayload>>(ctx.Request.Body, mpOptions);
     await ctx.Response.WriteAsync(list.Count.ToString());
 });
 
 app.MapPost("/api/messagepack-lz4/deserialize-only", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    var list = MessagePackSerializer.Deserialize<List<TestPayload>>(bytes, mpLz4Options);
+    var list = await MessagePackSerializer.DeserializeAsync<List<TestPayload>>(ctx.Request.Body, mpLz4Options);
     await ctx.Response.WriteAsync(list.Count.ToString());
 });
 
 app.MapPost("/api/protobuf-net/deserialize-only", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
-    using var ms = new MemoryStream(bytes);
+    // Read request body into memory stream for async operation
+    using var ms = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(ms);
+    ms.Position = 0;
+
     var list = Serializer.Deserialize<List<TestPayload>>(ms);
     await ctx.Response.WriteAsync(list.Count.ToString());
 });
 
 app.MapPost("/api/google-protobuf/deserialize-only", async (HttpContext ctx) =>
 {
-    var bytes = await ReadAllBytesAsync(ctx.Request.Body);
+    // Read request body into memory for async operation
+    using var ms = new MemoryStream();
+    await ctx.Request.Body.CopyToAsync(ms);
+    var bytes = ms.ToArray();
+
     var listProto = TestPayloadListProto.Parser.ParseFrom(bytes);
     await ctx.Response.WriteAsync(listProto.Items.Count.ToString());
 });
 
 app.Run();
-
-static async Task<byte[]> ReadAllBytesAsync(Stream s)
-{
-    using var ms = new MemoryStream();
-    await s.CopyToAsync(ms);
-    return ms.ToArray();
-}
