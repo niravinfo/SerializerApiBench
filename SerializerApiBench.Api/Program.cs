@@ -84,6 +84,7 @@ app.MapPost("/api/protobuf-net/roundtrip", async (HttpContext ctx) =>
     var list = Serializer.Deserialize<List<TestPayload>>(ctx.Request.Body);
     ctx.Response.ContentType = "application/x-protobuf";
     Serializer.Serialize(ctx.Response.Body, list);
+    await ctx.Response.Body.FlushAsync();
 });
 
 app.MapPost("/api/google-protobuf/roundtrip", async (HttpContext ctx) =>
@@ -91,6 +92,7 @@ app.MapPost("/api/google-protobuf/roundtrip", async (HttpContext ctx) =>
     var listProto = TestPayloadListProto.Parser.ParseFrom(ctx.Request.Body);
     ctx.Response.ContentType = "application/x-protobuf";
     listProto.WriteTo(ctx.Response.Body);
+    await ctx.Response.Body.FlushAsync();
 });
 
 // ============================================================
@@ -132,12 +134,14 @@ app.MapGet("/api/protobuf-net/serialize-only", async (HttpContext ctx, int count
 {
     ctx.Response.ContentType = "application/x-protobuf";
     Serializer.Serialize(ctx.Response.Body, cache[count]);
+    await ctx.Response.Body.FlushAsync();
 });
 
 app.MapGet("/api/google-protobuf/serialize-only", async (HttpContext ctx, int count) =>
 {
     ctx.Response.ContentType = "application/x-protobuf";
     protoCache[count].WriteTo(ctx.Response.Body);
+    await ctx.Response.Body.FlushAsync();
 });
 
 // ============================================================
