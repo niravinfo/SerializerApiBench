@@ -23,6 +23,7 @@ $Modes = @("serialize-only", "deserialize-only")
 
 $Endpoints = @{
     "json"             = "application/json"
+    "newtonsoft-json"  = "application/json"
     "messagepack"      = "application/x-msgpack"
     "messagepack-lz4"  = "application/x-msgpack"
     "protobuf-net"     = "application/x-protobuf"

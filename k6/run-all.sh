@@ -20,6 +20,7 @@ MODES=(serialize-only deserialize-only roundtrip)
 
 declare -A ENDPOINTS=(
   [json]="application/json"
+  [newtonsoft-json]="application/json"
   [messagepack]="application/x-msgpack"
   [messagepack-lz4]="application/x-msgpack"
   [protobuf-net]="application/x-protobuf"
