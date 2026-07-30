@@ -215,4 +215,4 @@ app.MapPost("/api/google-protobuf/deserialize-only", async (HttpContext ctx) =>
     await ctx.Response.WriteAsync(listProto.Items.Count.ToString());
 });
 
-app.Run();
+await app.RunAsync();
