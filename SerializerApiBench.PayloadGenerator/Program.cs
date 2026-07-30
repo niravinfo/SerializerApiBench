@@ -35,8 +35,7 @@ foreach (var count in counts)
         File.WriteAllBytes(Path.Combine(outDir, $"payload_protobuf-net_{count}.bin"), protoMs.ToArray());
     }
 
-    var listProto = new TestPayloadListProto();
-    listProto.Items.AddRange(list.Select(p => p.ToProto()));
+    var listProto = TestDataFactory.GetTestPayloadListProto(list);
     File.WriteAllBytes(Path.Combine(outDir, $"payload_google-protobuf_{count}.bin"), listProto.ToByteArray());
 
     Console.WriteLine($"Generated payloads for count={count}");
