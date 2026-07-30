@@ -21,7 +21,7 @@ var mpLz4Options = MessagePackSerializerOptions.Standard.WithCompression(Message
 // itself carries no body and no deserialize cost — purely isolating serialize time
 // (+ response transfer). Same seed as PayloadGenerator, so the data is identical
 // to what "roundtrip" / "deserialize-only" receive as request bodies.
-var cache = new Dictionary<int, List<TestPayload>>
+var cache = new Dictionary<int, TestPayload[]>
 {
     [10] = TestDataFactory.Generate(10),
     [100] = TestDataFactory.Generate(100),
@@ -33,9 +33,7 @@ var cache = new Dictionary<int, List<TestPayload>>
 var protoCache = new Dictionary<int, TestPayloadListProto>();
 foreach (var kvp in cache)
 {
-    var listProto = new TestPayloadListProto();
-    listProto.Items.AddRange(kvp.Value.Select(p => p.ToProto()));
-    protoCache[kvp.Key] = listProto;
+    protoCache[kvp.Key] = TestDataFactory.GetTestPayloadListProto(kvp.Value);
 }
 
 app.MapGet("/", () => "SerializerApiBench.Api is running. See README for endpoint list.");
@@ -217,4 +215,4 @@ app.MapPost("/api/google-protobuf/deserialize-only", async (HttpContext ctx) =>
     await ctx.Response.WriteAsync(listProto.Items.Count.ToString());
 });
 
-app.Run();
+await app.RunAsync();

@@ -35,23 +35,23 @@ public class TestPayload
 
     [Key(5)]
     [ProtoMember(6)]
-    public string Description { get; set; } = string.Empty;
+    public string? Description { get; set; }
 
     [Key(6)]
     [ProtoMember(7)]
-    public int Age { get; set; }
+    public int? Age { get; set; }
 
     [Key(7)]
     [ProtoMember(8)]
-    public float Rating { get; set; }
+    public double? Rating { get; set; }
 
     [Key(8)]
     [ProtoMember(9)]
-    public List<string> Tags { get; set; } = new();
+    public string[] Tags { get; set; } = [];
 
     [Key(9)]
     [ProtoMember(10)]
-    public List<string> Categories { get; set; } = new();
+    public List<string> Categories { get; set; } = [];
 
     [Key(10)]
     [ProtoMember(11)]
@@ -70,15 +70,7 @@ public class Address
     [ProtoMember(2)]
     public string City { get; set; } = string.Empty;
 
-    [Key(2)]
-    [ProtoMember(3)]
-    public string State { get; set; } = string.Empty;
-
     [Key(3)]
     [ProtoMember(4)]
-    public string Zip { get; set; } = string.Empty;
-
-    [Key(4)]
-    [ProtoMember(5)]
-    public string Country { get; set; } = string.Empty;
+    public string ZipCode { get; set; } = string.Empty;
 }

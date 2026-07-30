@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/wrappers.proto";
+
 option csharp_namespace = "SerializerApiBench.Models.Proto";
 
 package serializerapibench;
@@ -7,9 +9,7 @@ package serializerapibench;
 message AddressProto {
   string street = 1;
   string city = 2;
-  string state = 3;
-  string zip = 4;
-  string country = 5;
+  string zip_code = 3;
 }
 
 message TestPayloadProto {
@@ -18,9 +18,9 @@ message TestPayloadProto {
   bool is_active = 3;
   double score = 4;
   string created_at = 5;
-  string description = 6;
-  int32 age = 7;
-  float rating = 8;
+  google.protobuf.StringValue description = 6;
+  google.protobuf.Int32Value age = 7;
+  google.protobuf.DoubleValue rating = 8;
   repeated string tags = 9;
   repeated string categories = 10;
   AddressProto address = 11;
