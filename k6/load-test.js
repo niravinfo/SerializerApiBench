@@ -18,6 +18,10 @@ const MODE = __ENV.MODE || 'serialize-only';
 export const options = {
   vus: Number(__ENV.VUS || 25),
   duration: __ENV.DURATION || '30s',
+  // Don't buffer response bodies: we only check status, and keeping every body in
+  // JS memory (esp. 1000-item payloads) adds GC pressure that can make k6 itself
+  // the bottleneck instead of the API under test.
+  discardResponseBodies: true,
   thresholds: {
     http_req_failed: ['rate<0.01'],
   },

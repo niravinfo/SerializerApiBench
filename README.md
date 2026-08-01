@@ -51,7 +51,7 @@ handed equivalent data.
 dotnet run -c Release --project SerializerApiBench.Api
 ```
 
-**Option B — Docker, capped at 1 CPU / 512MB** (recommended — this is what makes the
+**Option B — Docker, capped at 2 CPU / 512MB** (recommended — this is what makes the
 comparison fair, since every serializer gets exactly the same ceiling):
 
 ```bash
