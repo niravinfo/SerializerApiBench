@@ -10,6 +10,7 @@ The first column, "key", is the JSON filename without extension.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -93,6 +94,41 @@ def flatten_dict(value, parent_key="", sep="."):
     return flat
 
 
+# Matches k6 result filenames like:
+#   google-protobuf_serialize-only_10.json
+#   messagepack-lz4_roundtrip_1000.json
+#
+# Captures the serializer name (which may contain hyphens), the operation
+# (serialize-only / deserialize-only / roundtrip), and the numeric payload size.
+_FILENAME_PATTERN = re.compile(
+    r"^(?P<serializer>.+?)_(?P<category>serialize-only|deserialize-only|roundtrip)_(?P<payload_size>\d+)$"
+)
+
+
+def parse_filename_metadata(filename_stem: str):
+    """
+    Parse the k6 result filename into descriptive columns.
+
+    The result is used as:
+        row.update({
+            "serializer": "messagepack-lz4",
+            "category": "roundtrip",
+            "payload_size": 1000,
+        })
+
+    Returns None if the filename does not match the expected pattern.
+    """
+    match = _FILENAME_PATTERN.match(filename_stem)
+    if not match:
+        return None
+
+    return {
+        "serializer": match.group("serializer"),
+        "category": match.group("category"),
+        "payload_size": int(match.group("payload_size")),
+    }
+
+
 def load_k6_metrics(json_path: Path):
     """
     Load one k6 JSON summary file and return flattened metrics.
@@ -145,9 +181,18 @@ def main():
             print(f"Skipping {json_path.name}: no top-level 'metrics' object found.")
             continue
 
+        metadata = parse_filename_metadata(json_path.stem)
+        if metadata is None:
+            print(
+                f"Skipping {json_path.name}: filename does not match the expected "
+                "pattern '<serializer>_<category>_<payload_size>'."
+            )
+            continue
+
         row = {
             "key": json_path.stem,
         }
+        row.update(metadata)
         row.update(metrics_row)
 
         rows.append(row)
@@ -158,10 +203,15 @@ def main():
 
     df = pd.DataFrame.from_dict(rows)
 
-    # Keep the identifier column first.
-    # Sort the remaining metric columns for stable/deterministic CSV output.
-    metric_columns = sorted(column for column in df.columns if column != "key")
-    df = df.reindex(columns=["key", *metric_columns])
+    # Keep the identifier column first, followed by descriptive columns parsed
+    # from the filename, then sort the remaining metric columns for stable CSV output.
+    descriptive_columns = ["serializer", "category", "payload_size"]
+    metric_columns = sorted(
+        column
+        for column in df.columns
+        if column not in {"key", *descriptive_columns}
+    )
+    df = df.reindex(columns=["key", *descriptive_columns, *metric_columns])
 
     df.to_csv(
         OUTPUT_CSV,
